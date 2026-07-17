@@ -8,4 +8,7 @@ add_executable(mini_sgbd
     main.cpp
     BufferManager.cpp
     StorageManager.cpp
+    SearchManager.cpp
+    SortManager.cpp
+    QueryManager.cpp
 )

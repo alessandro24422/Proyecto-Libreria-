@@ -1,6 +1,6 @@
-# Mini SGBD de libros - modulo de almacenamiento
+# Mini SGBD de libros
 
-Este modulo cubre la parte del Integrante 1:
+El proyecto incluye almacenamiento y procesamiento de consultas:
 
 - `Libro.h`: estructura fija del registro para escritura binaria.
 - `StorageManager.h/.cpp`: operaciones basicas de almacenamiento.
@@ -8,6 +8,10 @@ Este modulo cubre la parte del Integrante 1:
 - `data/libros.dat`: archivo binario de registros paginados.
 - `data/indice_hash.dat`: indice hash persistente para busqueda rapida por ID.
 - `biblioteca/<genero>/`: carpetas donde se organizan los PDFs por genero.
+- `QueryResult.h`: resultado y metricas de una consulta.
+- `SearchManager.h/.cpp`: busquedas por indice Hash y filtros parciales.
+- `SortManager.h/.cpp`: ordenamiento con `std::sort`.
+- `QueryManager.h/.cpp`: parser y ejecutor de consultas `SELECT`.
 
 ## Funciones principales
 
@@ -18,6 +22,33 @@ Este modulo cubre la parte del Integrante 1:
 - `guardarLibros(libros)`
 - `listarLibros()`
 - `buscarPorID(id)` usando indice hash
+
+## Motor de consultas
+
+```cpp
+StorageManager storage("data", "biblioteca");
+QueryManager consultas(storage);
+QueryResult resultado = consultas.ejecutar("SELECT * WHERE titulo = \"C++\"");
+```
+
+Consultas admitidas (las palabras clave no distinguen mayusculas):
+
+- `SELECT *`
+- `SELECT * WHERE id = 5`
+- `SELECT * WHERE titulo = "C++"`
+- `SELECT * WHERE autor = "Bjarne"`
+- `SELECT * WHERE anio = 2024`
+- `SELECT * WHERE editorial = "Pearson"`
+- `SELECT * ORDER BY titulo ASC`
+- `SELECT * ORDER BY anio DESC`
+
+Los filtros textuales, de anio y editorial son parciales e insensibles a
+mayusculas. `QueryResult` expone los registros, tiempo en microsegundos,
+registros leidos/encontrados, uso de indice y la consulta original.
+
+`Libro` ahora contiene `editorial`. La estructura conserva el mismo tamano
+binario que la version anterior, por compatibilidad con los archivos de datos;
+la ruta PDF admite hasta 140 caracteres.
 
 ## Compilacion rapida
 
@@ -32,7 +63,7 @@ cmake --build build
 Con g++:
 
 ```bash
-g++ -std=c++17 main.cpp BufferManager.cpp StorageManager.cpp -o mini_sgbd
+g++ -std=c++17 main.cpp BufferManager.cpp StorageManager.cpp SearchManager.cpp SortManager.cpp QueryManager.cpp -o mini_sgbd
 ./mini_sgbd
 ```
 

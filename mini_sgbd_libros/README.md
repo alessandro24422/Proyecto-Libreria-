@@ -1,6 +1,10 @@
-# Mini SGBD de libros - modulo de almacenamiento
+# Mini SGBD de libros
 
-Este modulo cubre la parte del Integrante 1:
+El proyecto incluye almacenamiento, búsqueda, ordenamiento y un gestor de
+consultas básico. La interfaz SFML puede consumir estos módulos sin conocer la
+organización interna de los archivos.
+
+## Módulo de almacenamiento
 
 - `Libro.h`: estructura fija del registro para escritura binaria.
 - `StorageManager.h/.cpp`: operaciones basicas de almacenamiento.
@@ -20,6 +24,58 @@ Este modulo cubre la parte del Integrante 1:
 - `buscarPorID(id)` usando indice hash
 - `abrirPdf(id)` para abrir el PDF con el lector predeterminado del sistema
 
+## Módulo de búsquedas, ordenamiento y consultas
+
+- `SearchManager.h/.cpp`: búsquedas y filtros de la cláusula `WHERE`.
+- `SortManager.h/.cpp`: ordenamientos para `ORDER BY` con `std::sort`.
+
+`SearchManager` recibe una referencia al `StorageManager`, por lo que no duplica
+los datos ni la lógica de persistencia. `buscarPorID()` utiliza el índice hash
+persistente; las búsquedas por texto recorren los libros activos y no distinguen
+mayúsculas/minúsculas.
+
+```cpp
+StorageManager storage("data", "biblioteca");
+SearchManager busquedas(storage);
+
+auto libro = busquedas.buscarPorID(7);             // índice hash
+auto autores = busquedas.buscarPorAutor("Borges");
+auto titulos = busquedas.buscarPorTitulo("cien");
+auto porGenero = busquedas.buscarPorGenero("Novela");
+auto porAnio = busquedas.buscarPorAnio(1963);
+
+auto ordenados = SortManager::ordenarPorTitulo(storage.listarLibros());
+auto recientes = SortManager::ordenarPorAnio(storage.listarLibros(), false);
+```
+
+### Consultas propias (SELECT / WHERE / ORDER BY)
+
+Para cubrir el procesamiento de consultas mínimo, `ejecutarConsulta()` acepta:
+
+```text
+SELECT *
+SELECT * WHERE autor CONTAINS Borges
+SELECT * WHERE anio = 1963 ORDER BY titulo ASC
+SELECT * WHERE genero = Novela ORDER BY anio DESC
+```
+
+Los campos admitidos en `WHERE` son `id`, `titulo`, `autor`, `genero` y `anio`.
+En los campos de texto se puede usar `=` (igualdad) o `CONTAINS` (coincidencia
+parcial); para `id` y `anio` el valor debe ser numérico. En `ORDER BY` se admiten
+`titulo`, `autor` y `anio`, con `ASC` (valor predeterminado) o `DESC`.
+
+```cpp
+ResultadoConsulta resultado = busquedas.ejecutarConsulta(
+    "SELECT * WHERE autor CONTAINS Garcia ORDER BY anio DESC");
+
+// resultado.libros, resultado.mensaje y resultado.duracion
+ComparacionBusquedaId medicion = busquedas.compararBusquedaPorID(7);
+// medicion.tiempoIndice frente a medicion.tiempoLineal
+```
+
+`compararBusquedaPorID()` permite registrar en el artículo los tiempos de una
+búsqueda indexada y una secuencial sobre los mismos datos.
+
 ## Compilacion rapida
 
 Con CMake:
@@ -33,7 +89,7 @@ cmake --build build
 Con g++:
 
 ```bash
-g++ -std=c++17 main.cpp BufferManager.cpp StorageManager.cpp -o mini_sgbd
+g++ -std=c++17 main.cpp BufferManager.cpp StorageManager.cpp SearchManager.cpp SortManager.cpp -o mini_sgbd
 ./mini_sgbd
 ```
 
@@ -53,6 +109,10 @@ Al ejecutarlo valida:
 - reconstruccion del indice hash;
 - persistencia al recargar el `StorageManager`;
 - preparacion de la funcion `abrirPdf(id)`.
+- búsquedas por título, autor y año;
+- ordenamientos por título y año;
+- una consulta `SELECT` con `WHERE` y `ORDER BY`;
+- comparación de tiempos de búsqueda indexada y lineal.
 
 ## Como se guardan los datos
 

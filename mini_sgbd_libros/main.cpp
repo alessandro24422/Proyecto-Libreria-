@@ -1,5 +1,8 @@
 #include "StorageManager.h"
+#include "SearchManager.h"
+#include "SortManager.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -104,6 +107,50 @@ int main() {
     std::cout << "\n8) Apertura de PDF\n";
     std::cout << "La funcion existe, pero no se ejecuta automaticamente para no abrir ventanas.\n";
     std::cout << "Ejemplo para la interfaz SFML: storage.abrirPdf(1);\n";
+
+    // Pruebas del modulo de consultas. Se usa la instancia recargada para
+    // demostrar que estas operaciones trabajan sobre datos persistidos.
+    SearchManager busquedas(storageRecargado);
+
+    std::cout << "\n9) Busquedas con filtros WHERE\n";
+    const auto porTitulo = busquedas.buscarPorTitulo("quijote");
+    imprimirResultado("Buscar titulo parcial 'quijote'", porTitulo.size() == 1 && porTitulo[0].id == 10);
+    const auto porAutor = busquedas.buscarPorAutor("Borges");
+    imprimirResultado("Buscar autor sin distinguir mayusculas", porAutor.size() == 1 && porAutor[0].id == 4);
+    const auto porAnio = busquedas.buscarPorAnio(1963);
+    imprimirResultado("Filtrar por anio 1963", porAnio.size() == 2);
+
+    std::cout << "\n10) Ordenamiento\n";
+    const auto porTituloOrdenado = SortManager::ordenarPorTitulo(storageRecargado.listarLibros());
+    const bool titulosOrdenados = std::is_sorted(porTituloOrdenado.begin(), porTituloOrdenado.end(),
+        [](const Libro& primero, const Libro& segundo) {
+            return std::string(primero.titulo) < std::string(segundo.titulo);
+        });
+    imprimirResultado("Ordenar libros por titulo", titulosOrdenados);
+
+    const auto porAnioDescendente = SortManager::ordenarPorAnio(storageRecargado.listarLibros(), false);
+    const bool aniosDescendentes = std::is_sorted(porAnioDescendente.begin(), porAnioDescendente.end(),
+        [](const Libro& primero, const Libro& segundo) { return primero.anio > segundo.anio; });
+    imprimirResultado("Ordenar libros por anio descendente", aniosDescendentes);
+
+    std::cout << "\n11) Consulta SELECT propia\n";
+    const ResultadoConsulta consulta = busquedas.ejecutarConsulta(
+        "SELECT * WHERE genero = Novela ORDER BY anio DESC");
+    imprimirResultado("SELECT con WHERE y ORDER BY", consulta.mensaje == "Consulta ejecutada correctamente." &&
+                                                   consulta.libros.size() == 3 &&
+                                                   std::is_sorted(consulta.libros.begin(), consulta.libros.end(),
+                                                       [](const Libro& primero, const Libro& segundo) {
+                                                           return primero.anio > segundo.anio;
+                                                       }));
+    std::cout << "Tiempo de la consulta: " << consulta.duracion.count() << " ns\n";
+
+    std::cout << "\n12) Evaluacion de indice hash\n";
+    const ComparacionBusquedaId medicion = busquedas.compararBusquedaPorID(7);
+    imprimirResultado("Indice y busqueda lineal encuentran el mismo ID",
+                      medicion.resultadoIndice.has_value() && medicion.resultadoLineal.has_value() &&
+                      medicion.resultadoIndice->id == medicion.resultadoLineal->id);
+    std::cout << "Busqueda por indice hash: " << medicion.tiempoIndice.count() << " ns\n"
+              << "Busqueda lineal: " << medicion.tiempoLineal.count() << " ns\n";
 
     return 0;
 }

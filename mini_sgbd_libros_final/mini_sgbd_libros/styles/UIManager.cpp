@@ -1,5 +1,7 @@
 #include "UIManager.h"
 
+#include "SortManager.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -22,7 +24,7 @@ std::string resumir(const char* valor, std::size_t limite) {
 }
 
 UIManager::UIManager(StorageManager& storage)
-    : storage_(storage), ventana_(sf::VideoMode(1280, 760), "Libros | Mini SGBD", sf::Style::Close) {
+    : storage_(storage), busquedas_(storage), ventana_(sf::VideoMode(1280, 760), "Libros | Mini SGBD", sf::Style::Close) {
     ventana_.setFramerateLimit(60);
     cargarFuente();
     recargarCatalogo();
@@ -147,27 +149,27 @@ void UIManager::abrirPdfSeleccionado() {
 
 void UIManager::buscar() {
     if (consulta_.empty()) { aviso_ = "Ingrese un valor de busqueda."; return; }
-    librosVista_.clear();
+    if (consulta_.size() >= 6 && minusculas(consulta_.substr(0, 6)) == "select") {
+        ResultadoConsulta resultado = busquedas_.ejecutarConsulta(consulta_);
+        librosVista_ = std::move(resultado.libros);
+        seleccionado_ = -1;
+        vista_ = Vista::Catalogo;
+        aviso_ = resultado.mensaje + " " + std::to_string(resultado.duracion.count()) + " ns.";
+        return;
+    }
     if (criterioBusqueda_ == "ID") {
         try { auto libro = storage_.buscarPorID(std::stoi(consulta_)); if (libro) librosVista_.push_back(*libro); }
         catch (const std::exception&) { aviso_ = "El ID debe ser numerico."; return; }
-    } else {
-        const std::string termino = minusculas(consulta_);
-        for (const Libro& libro : storage_.listarLibros()) {
-            const std::string valor = criterioBusqueda_ == "Titulo" ? libro.titulo : libro.autor;
-            if (minusculas(valor).find(termino) != std::string::npos) librosVista_.push_back(libro);
-        }
-    }
+    } else if (criterioBusqueda_ == "Titulo") librosVista_ = busquedas_.buscarPorTitulo(consulta_);
+    else librosVista_ = busquedas_.buscarPorAutor(consulta_);
     seleccionado_ = -1; vista_ = Vista::Catalogo; aviso_ = std::to_string(librosVista_.size()) + " resultado(s) encontrado(s).";
 }
 
 void UIManager::ordenar() {
-    librosVista_ = storage_.listarLibros();
-    std::sort(librosVista_.begin(), librosVista_.end(), [this](const Libro& a, const Libro& b) {
-        if (criterioOrden_ == "Autor") return minusculas(a.autor) < minusculas(b.autor);
-        if (criterioOrden_ == "Anio") return a.anio < b.anio;
-        return minusculas(a.titulo) < minusculas(b.titulo);
-    });
+    const std::vector<Libro> libros = storage_.listarLibros();
+    if (criterioOrden_ == "Autor") librosVista_ = SortManager::ordenarPorAutor(libros);
+    else if (criterioOrden_ == "Anio") librosVista_ = SortManager::ordenarPorAnio(libros);
+    else librosVista_ = SortManager::ordenarPorTitulo(libros);
     seleccionado_ = -1; vista_ = Vista::Catalogo; aviso_ = "Catalogo ordenado por " + criterioOrden_ + ".";
 }
 
@@ -206,7 +208,7 @@ void UIManager::dibujarFormulario() {
 }
 
 void UIManager::dibujarBuscar() {
-    texto("Buscar libros", 260, 34, 28, TEXTO, true); texto("ID usa el indice hash; titulo y autor consultan registros activos.", 260, 75, 15, TENUE); boton({260, 170, 140, 42}, "Por ID", criterioBusqueda_ == "ID"); boton({415, 170, 140, 42}, "Por titulo", criterioBusqueda_ == "Titulo"); boton({570, 170, 140, 42}, "Por autor", criterioBusqueda_ == "Autor"); campo({260, 265, 560, 48}, "Consulta", consulta_, Campo::Consulta, "Escriba el valor a buscar"); boton({840, 265, 145, 48}, "Buscar", true); texto("Los resultados se muestran en Catalogo.", 260, 380, 16, TENUE);
+    texto("Buscar libros", 260, 34, 28, TEXTO, true); texto("ID usa el indice hash. Tambien admite SELECT * con WHERE y ORDER BY.", 260, 75, 15, TENUE); boton({260, 170, 140, 42}, "Por ID", criterioBusqueda_ == "ID"); boton({415, 170, 140, 42}, "Por titulo", criterioBusqueda_ == "Titulo"); boton({570, 170, 140, 42}, "Por autor", criterioBusqueda_ == "Autor"); campo({260, 265, 560, 48}, "Consulta", consulta_, Campo::Consulta, "Valor o SELECT * WHERE autor CONTAINS Borges"); boton({840, 265, 145, 48}, "Buscar", true); texto("Los resultados se muestran en Catalogo.", 260, 380, 16, TENUE);
 }
 
 void UIManager::dibujarOrdenar() {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "StorageManager.h"
+#include "SearchManager.h"
 
 #include <SFML/Graphics.hpp>
 #include <string>
@@ -17,6 +17,7 @@ private:
     enum class Campo { Ninguno, Id, Anio, Titulo, Autor, Dewey, Pdf, Consulta };
 
     StorageManager& storage_;
+    SearchManager busquedas_;
     sf::RenderWindow ventana_;
     sf::Font fuente_;
     Vista vista_{Vista::Inicio};

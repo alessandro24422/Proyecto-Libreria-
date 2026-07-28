@@ -451,6 +451,30 @@ std::vector<Libro> StorageManager::listarLibros()
     return cargarLibros();
 }
 
+//==============================================================
+// Reemplaza el catálogo completo. Se conserva por compatibilidad
+// con las demostraciones y deja el índice y el buffer coherentes.
+//==============================================================
+
+void StorageManager::guardarLibros(const std::vector<Libro>& libros)
+{
+    buffer.limpiarBuffer();
+
+    std::ofstream datos(archivoDatos,
+                        std::ios::binary | std::ios::trunc);
+    datos.close();
+
+    indiceHash.clear();
+    guardarIndiceHash();
+
+    for (const Libro& libro : libros)
+    {
+        agregarLibro(libro);
+    }
+
+    buffer.flush();
+}
+
 BufferManager& StorageManager::obtenerBuffer()
 {
     return buffer;

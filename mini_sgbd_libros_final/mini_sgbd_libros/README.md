@@ -5,6 +5,9 @@ Este modulo cubre la parte del Integrante 1:
 - `Libro.h`: estructura fija del registro para escritura binaria.
 - `StorageManager.h/.cpp`: operaciones basicas de almacenamiento.
 - `BufferManager.h/.cpp`: lectura/escritura de paginas con Buffer Pool y reemplazo FIFO.
+- `SearchManager.h/.cpp`: búsquedas, filtros y consultas `SELECT`.
+- `SortManager.h/.cpp`: ordenamientos por título, autor y año.
+- `QueryOperators.h/.cpp`: operadores físicos del pipeline Volcano.
 - `data/libros.dat`: archivo binario de registros paginados.
 - `data/indice_hash.dat`: indice hash persistente para busqueda rapida por ID.
 - `biblioteca/<genero>/`: carpetas donde se organizan los PDFs por genero.
@@ -33,7 +36,7 @@ cmake --build build
 Con g++:
 
 ```bash
-g++ -std=c++17 main.cpp BufferManager.cpp StorageManager.cpp -o mini_sgbd
+g++ -std=c++17 -Iinclude -Istyles main.cpp BufferManager.cpp StorageManager.cpp QueryOperators.cpp SearchManager.cpp SortManager.cpp styles/UIManager.cpp -lsfml-graphics -lsfml-window -lsfml-system -o mini_sgbd
 ./mini_sgbd
 ```
 
@@ -100,3 +103,30 @@ if (!storage.abrirPdf(2)) {
 ```
 
 En Windows usa `start`, en macOS usa `open` y en Linux usa `xdg-open`.
+
+## Consultas y ordenamiento
+
+La interfaz delega las búsquedas y los ordenamientos en `SearchManager` y
+`SortManager`. Además de buscar por ID, título o autor, el cuadro de búsqueda
+acepta consultas como:
+
+```text
+SELECT * WHERE codigoDewey CONTAINS 86 ORDER BY anio DESC
+SELECT * WHERE autor CONTAINS Borges ORDER BY titulo ASC
+```
+
+Los campos admitidos en `WHERE` son `id`, `titulo`, `autor`, `codigoDewey`
+(o `dewey`) y `anio`. Para texto se admite `=` o `CONTAINS`; para `id` y
+`anio` solamente `=`.
+
+Las consultas se ejecutan mediante el modelo Volcano: cada operador implementa
+`open()`, `next()` y `close()`. El plan se compone dinámicamente como:
+
+```text
+ScanOperator -> FilterOperator (opcional) -> SortOperator (opcional)
+```
+
+`ScanOperator` obtiene los registros activos desde `StorageManager` uno por
+uno; `FilterOperator` solicita registros a su hijo hasta encontrar una
+coincidencia; y `SortOperator` materializa y ordena su entrada antes de
+devolver resultados individuales con `next()`.
